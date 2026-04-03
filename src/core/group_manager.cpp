@@ -142,7 +142,7 @@ TabGroup* GroupManager::CreateGroup(HWND a, HWND b) {
     Taskbar::Instance().HideButton(a);
 
     group->UpdatePosition();
-    group->EnsureZOrder();
+    group->ForceActivate();
 
     if (group->tabBarHwnd) {
         InvalidateRect(group->tabBarHwnd, nullptr, FALSE);
@@ -206,7 +206,7 @@ void GroupManager::AddToGroup(TabGroup* group, HWND hwnd) {
         InvalidateRect(group->tabBarHwnd, nullptr, FALSE);
         UpdateWindow(group->tabBarHwnd);
     }
-    group->EnsureZOrder();
+    group->ForceActivate();
 
     LOG_INFO(L"Added window %p to group (now %d tabs, active=%d, tabBar=%p visible=%d)",
         hwnd, group->tabCount, group->activeIndex,

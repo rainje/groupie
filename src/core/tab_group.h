@@ -31,4 +31,5 @@ struct TabGroup {
     void UpdateTitle(HWND hwnd);
     void UpdatePosition();
     void EnsureZOrder();
+    void ForceActivate();
 };

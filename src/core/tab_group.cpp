@@ -1,6 +1,7 @@
 #include "core/tab_group.h"
 #include "util/win32_helpers.h"
 #include "util/taskbar.h"
+#include "util/icon_cache.h"
 #include "util/log.h"
 
 int TabGroup::FindTab(HWND hwnd) const {
@@ -96,9 +97,16 @@ void TabGroup::EnsureZOrder() {
     HWND currentOwner = GetWindow(tabBarHwnd, GW_OWNER);
     if (currentOwner != active) {
         SetWindowLongPtrW(tabBarHwnd, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR>(active));
+        // Ownership change can invalidate D2D resources
+        IconCache::Instance().Clear();
     }
+}
 
-    ForceSetForeground(active);
+// Heavy version — only call on explicit user actions (group creation, tab switch)
+void TabGroup::ForceActivate() {
+    if (tabCount == 0) return;
+    EnsureZOrder();
+    ForceSetForeground(tabs[activeIndex].hwnd);
 }
 
 void TabGroup::SwitchTo(uint32_t index) {
