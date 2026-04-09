@@ -61,6 +61,19 @@ inline RECT AdjustRectForDwmBorders(HWND hwnd, const RECT& targetRect) {
     };
 }
 
+// Check if a window covers the entire monitor (exclusive fullscreen or borderless fullscreen)
+inline bool IsFullscreen(HWND hwnd) {
+    HMONITOR hMon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi{};
+    mi.cbSize = sizeof(mi);
+    if (!GetMonitorInfoW(hMon, &mi)) return false;
+
+    RECT rc;
+    GetWindowRect(hwnd, &rc);
+    return rc.left <= mi.rcMonitor.left && rc.top <= mi.rcMonitor.top &&
+           rc.right >= mi.rcMonitor.right && rc.bottom >= mi.rcMonitor.bottom;
+}
+
 // Check if a window is a valid top-level application window
 inline bool IsTopLevelAppWindow(HWND hwnd) {
     if (!IsWindowVisible(hwnd)) return false;

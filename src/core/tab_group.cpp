@@ -20,6 +20,8 @@ bool TabGroup::AddTab(HWND hwnd) {
     tab.isActive = false;
     GetWindowTextW(hwnd, tab.title, _countof(tab.title));
     tab.icon = nullptr;
+    tab.savedPlacement.length = sizeof(WINDOWPLACEMENT);
+    GetWindowPlacement(hwnd, &tab.savedPlacement);
 
     tabCount++;
     needsRedraw = true;
@@ -97,8 +99,6 @@ void TabGroup::EnsureZOrder() {
     HWND currentOwner = GetWindow(tabBarHwnd, GW_OWNER);
     if (currentOwner != active) {
         SetWindowLongPtrW(tabBarHwnd, GWLP_HWNDPARENT, reinterpret_cast<LONG_PTR>(active));
-        // Ownership change can invalidate D2D resources
-        IconCache::Instance().Clear();
     }
 }
 
@@ -152,6 +152,20 @@ void TabGroup::UpdatePosition() {
     if (adjustingPosition) return;
 
     HWND active = tabs[activeIndex].hwnd;
+
+    // Hide tab bar when window is fullscreen
+    if (IsFullscreen(active)) {
+        if (IsWindowVisible(tabBarHwnd)) {
+            ShowWindow(tabBarHwnd, SW_HIDE);
+        }
+        return;
+    }
+
+    // Restore tab bar if it was hidden for fullscreen
+    if (!isMinimized && !IsWindowVisible(tabBarHwnd)) {
+        ShowWindow(tabBarHwnd, SW_SHOWNOACTIVATE);
+    }
+
     bool maximized = IsZoomed(active);
 
     if (maximized) {

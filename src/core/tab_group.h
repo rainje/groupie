@@ -11,6 +11,7 @@ struct TabInfo {
     wchar_t title[128]{};
     HICON icon = nullptr;
     bool isActive = false;
+    WINDOWPLACEMENT savedPlacement{};  // original placement before grouping
 };
 
 struct TabGroup {

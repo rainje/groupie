@@ -12,6 +12,17 @@ struct ModifyGuard {
     ~ModifyGuard() { flag = false; }
 };
 
+// Restore a window to its saved placement from before grouping
+static void RestoreWindow(HWND hwnd, const WINDOWPLACEMENT& savedPlacement) {
+    WINDOWPLACEMENT wp = savedPlacement;
+    wp.length = sizeof(WINDOWPLACEMENT);
+    // Ensure the window will be visible (not hidden or minimized)
+    if (wp.showCmd == SW_HIDE || wp.showCmd == SW_SHOWMINIMIZED || wp.showCmd == SW_MINIMIZE) {
+        wp.showCmd = SW_SHOWNORMAL;
+    }
+    SetWindowPlacement(hwnd, &wp);
+}
+
 GroupManager& GroupManager::Instance() {
     static GroupManager instance;
     return instance;
@@ -256,19 +267,24 @@ void GroupManager::RemoveFromGroup(HWND hwnd) {
     LOG_INFO(L"RemoveFromGroup: %p (group has %d tabs, active=%d)",
         hwnd, group->tabCount, group->activeIndex);
 
-    bool wasActive = (group->FindTab(hwnd) == static_cast<int>(group->activeIndex));
+    int idx = group->FindTab(hwnd);
+    if (idx < 0) return;
+
+    bool wasActive = (idx == static_cast<int>(group->activeIndex));
+    WINDOWPLACEMENT savedWp = group->tabs[idx].savedPlacement;
 
     group->RemoveTab(hwnd);
     RemoveLookup(hwnd);
 
-    ShowWindow(hwnd, SW_SHOW);
+    RestoreWindow(hwnd, savedWp);
     Taskbar::Instance().ShowButton(hwnd);
 
     if (group->tabCount <= 1) {
         if (group->tabCount == 1) {
             HWND remaining = group->tabs[0].hwnd;
+            WINDOWPLACEMENT remainingWp = group->tabs[0].savedPlacement;
             RemoveLookup(remaining);
-            ShowWindow(remaining, SW_SHOW);
+            RestoreWindow(remaining, remainingWp);
             Taskbar::Instance().ShowButton(remaining);
         }
         DestroyGroup(group);
@@ -294,10 +310,7 @@ void GroupManager::DestroyGroup(TabGroup* group) {
         HWND hwnd = group->tabs[i].hwnd;
         RemoveLookup(hwnd);
         if (IsWindow(hwnd)) {
-            if (!IsWindowVisible(hwnd)) {
-                ShowWindow(hwnd, SW_SHOW);
-                LOG_INFO(L"  Restored hidden window %p", hwnd);
-            }
+            RestoreWindow(hwnd, group->tabs[i].savedPlacement);
             Taskbar::Instance().ShowButton(hwnd);
         }
     }
@@ -328,8 +341,10 @@ void GroupManager::UngroupAll() {
         TabGroup* group = &groupPool_[i];
 
         for (uint32_t t = 0; t < group->tabCount; t++) {
-            ShowWindow(group->tabs[t].hwnd, SW_SHOW);
-            Taskbar::Instance().ShowButton(group->tabs[t].hwnd);
+            if (IsWindow(group->tabs[t].hwnd)) {
+                RestoreWindow(group->tabs[t].hwnd, group->tabs[t].savedPlacement);
+                Taskbar::Instance().ShowButton(group->tabs[t].hwnd);
+            }
             RemoveLookup(group->tabs[t].hwnd);
         }
 
