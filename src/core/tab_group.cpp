@@ -125,7 +125,9 @@ void TabGroup::SwitchTo(uint32_t index) {
 
     adjustingPosition = true;
 
-    if (IsZoomed(active)) {
+    if (IsIconic(active)) {
+        ShowWindow(active, SW_RESTORE);
+    } else if (IsZoomed(active)) {
         ShowWindow(active, SW_RESTORE);
     }
 

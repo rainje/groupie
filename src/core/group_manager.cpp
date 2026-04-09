@@ -215,6 +215,7 @@ void GroupManager::AddToGroup(TabGroup* group, HWND hwnd) {
 
 void GroupManager::MergeGroups(TabGroup* dest, TabGroup* src) {
     if (!dest || !src || dest == src) return;
+    ModifyGuard guard(modifying_);
 
     LOG_INFO(L"Merging groups: %d tabs into %d tabs", src->tabCount, dest->tabCount);
 
@@ -234,6 +235,7 @@ void GroupManager::MergeGroups(TabGroup* dest, TabGroup* src) {
     DestroyGroup(src);
 
     dest->UpdatePosition();
+    dest->ForceActivate();
     if (dest->tabBarHwnd) {
         InvalidateRect(dest->tabBarHwnd, nullptr, FALSE);
         UpdateWindow(dest->tabBarHwnd);
@@ -364,13 +366,25 @@ void GroupManager::OnWindowActivated(HWND hwnd) {
     if (idx >= 0 && static_cast<uint32_t>(idx) != group->activeIndex) {
         group->tabs[group->activeIndex].isActive = false;
         ShowWindow(group->tabs[group->activeIndex].hwnd, SW_HIDE);
+        Taskbar::Instance().HideButton(group->tabs[group->activeIndex].hwnd);
 
         group->activeIndex = static_cast<uint32_t>(idx);
         group->tabs[idx].isActive = true;
         group->needsRedraw = true;
 
+        // Ensure the newly activated window is visible
+        if (IsIconic(hwnd)) {
+            ShowWindow(hwnd, SW_RESTORE);
+        } else if (!IsWindowVisible(hwnd)) {
+            ShowWindow(hwnd, SW_SHOW);
+        }
+        Taskbar::Instance().ShowButton(hwnd);
+
+        group->isMinimized = false;
         group->UpdatePosition();
+        group->EnsureZOrder();
         if (group->tabBarHwnd) {
+            ShowWindow(group->tabBarHwnd, SW_SHOWNOACTIVATE);
             InvalidateRect(group->tabBarHwnd, nullptr, FALSE);
         }
     } else if (idx >= 0) {
