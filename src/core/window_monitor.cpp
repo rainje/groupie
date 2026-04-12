@@ -3,18 +3,25 @@
 #include "core/drag_detector.h"
 #include "util/log.h"
 
-bool WindowMonitor::Init() {
-    hHook_ = SetWinEventHook(
-        EVENT_MIN, EVENT_MAX,
-        nullptr,
-        WinEventCallback,
-        0, 0,
-        WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS
-    );
+static HWINEVENTHOOK InstallHook(DWORD eventMin, DWORD eventMax, WINEVENTPROC proc) {
+    return SetWinEventHook(eventMin, eventMax, nullptr, proc, 0, 0,
+        WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+}
 
-    if (!hHook_) {
-        LOG_INFO(L"Failed to install WinEvent hook");
-        return false;
+bool WindowMonitor::Init() {
+    // Install targeted hooks instead of EVENT_MIN..EVENT_MAX
+    // This drastically reduces the number of events we receive
+    hooks_[0] = InstallHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, WinEventCallback);
+    hooks_[1] = InstallHook(EVENT_SYSTEM_MOVESIZESTART, EVENT_SYSTEM_MOVESIZEEND, WinEventCallback);
+    hooks_[2] = InstallHook(EVENT_SYSTEM_MINIMIZESTART, EVENT_SYSTEM_MINIMIZEEND, WinEventCallback);
+    hooks_[3] = InstallHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_NAMECHANGE, WinEventCallback);
+
+    for (int i = 0; i < kHookCount; i++) {
+        if (!hooks_[i]) {
+            LOG_INFO(L"Failed to install WinEvent hook %d", i);
+            Shutdown();
+            return false;
+        }
     }
 
     LOG_INFO(L"Window monitor initialized");
@@ -22,9 +29,11 @@ bool WindowMonitor::Init() {
 }
 
 void WindowMonitor::Shutdown() {
-    if (hHook_) {
-        UnhookWinEvent(hHook_);
-        hHook_ = nullptr;
+    for (int i = 0; i < kHookCount; i++) {
+        if (hooks_[i]) {
+            UnhookWinEvent(hooks_[i]);
+            hooks_[i] = nullptr;
+        }
     }
 }
 

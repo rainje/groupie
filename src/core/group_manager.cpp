@@ -365,20 +365,33 @@ void GroupManager::OnWindowMoved(HWND hwnd) {
     TabGroup* group = FindGroup(hwnd);
     if (!group) return;
 
-    if (group->tabs[group->activeIndex].hwnd == hwnd) {
-        group->UpdatePosition();
+    if (group->tabs[group->activeIndex].hwnd != hwnd) return;
+
+    // Check fullscreen state — hide/show tab bar accordingly
+    if (IsFullscreen(hwnd)) {
+        if (group->tabBarHwnd && IsWindowVisible(group->tabBarHwnd)) {
+            ShowWindow(group->tabBarHwnd, SW_HIDE);
+        }
+        return;
     }
+    if (!group->isMinimized && group->tabBarHwnd && !IsWindowVisible(group->tabBarHwnd)) {
+        ShowWindow(group->tabBarHwnd, SW_SHOWNOACTIVATE);
+    }
+
+    group->UpdatePosition();
 }
 
 void GroupManager::OnWindowActivated(HWND hwnd) {
     if (modifying_) return;
 
     TabGroup* group = FindGroup(hwnd);
-
     if (!group) return;
 
     int idx = group->FindTab(hwnd);
     if (idx >= 0 && static_cast<uint32_t>(idx) != group->activeIndex) {
+        // Use ModifyGuard to prevent cascading events from ShowWindow/EnsureZOrder
+        ModifyGuard guard(modifying_);
+
         group->tabs[group->activeIndex].isActive = false;
         ShowWindow(group->tabs[group->activeIndex].hwnd, SW_HIDE);
         Taskbar::Instance().HideButton(group->tabs[group->activeIndex].hwnd);

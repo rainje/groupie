@@ -68,14 +68,17 @@ static void SetWindowToFillRect(HWND hwnd, const RECT& targetRect, UINT flags) {
 
 // Force a window to the foreground even from a background process
 static void ForceSetForeground(HWND hwnd) {
+    if (!IsWindow(hwnd)) return;
+
     DWORD ourThread = GetCurrentThreadId();
-    DWORD fgThread = GetWindowThreadProcessId(GetForegroundWindow(), nullptr);
+    HWND fgWnd = GetForegroundWindow();
+    DWORD fgThread = fgWnd ? GetWindowThreadProcessId(fgWnd, nullptr) : 0;
     DWORD targetThread = GetWindowThreadProcessId(hwnd, nullptr);
 
-    if (ourThread != fgThread) {
+    if (fgThread && ourThread != fgThread) {
         AttachThreadInput(ourThread, fgThread, TRUE);
     }
-    if (ourThread != targetThread && fgThread != targetThread) {
+    if (targetThread && ourThread != targetThread && fgThread != targetThread) {
         AttachThreadInput(ourThread, targetThread, TRUE);
     }
 
@@ -83,10 +86,10 @@ static void ForceSetForeground(HWND hwnd) {
         SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
     SetForegroundWindow(hwnd);
 
-    if (ourThread != fgThread) {
+    if (fgThread && ourThread != fgThread) {
         AttachThreadInput(ourThread, fgThread, FALSE);
     }
-    if (ourThread != targetThread && fgThread != targetThread) {
+    if (targetThread && ourThread != targetThread && fgThread != targetThread) {
         AttachThreadInput(ourThread, targetThread, FALSE);
     }
 }
@@ -152,20 +155,6 @@ void TabGroup::UpdatePosition() {
     if (adjustingPosition) return;
 
     HWND active = tabs[activeIndex].hwnd;
-
-    // Hide tab bar when window is fullscreen
-    if (IsFullscreen(active)) {
-        if (IsWindowVisible(tabBarHwnd)) {
-            ShowWindow(tabBarHwnd, SW_HIDE);
-        }
-        return;
-    }
-
-    // Restore tab bar if it was hidden for fullscreen
-    if (!isMinimized && !IsWindowVisible(tabBarHwnd)) {
-        ShowWindow(tabBarHwnd, SW_SHOWNOACTIVATE);
-    }
-
     bool maximized = IsZoomed(active);
 
     if (maximized) {

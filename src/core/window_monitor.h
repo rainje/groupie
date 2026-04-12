@@ -13,5 +13,6 @@ private:
         LONG idObject, LONG idChild, DWORD eventThread, DWORD eventTime
     );
 
-    HWINEVENTHOOK hHook_ = nullptr;
+    static constexpr int kHookCount = 4;
+    HWINEVENTHOOK hooks_[kHookCount]{};
 };
